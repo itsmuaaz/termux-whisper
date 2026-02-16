@@ -41,6 +41,7 @@ You can also use the `whisper` command directly with arguments:
 | **Generate Subtitles** | `whisper movie.mkv --subs` |
 | **Generate Lyrics** | `whisper song.mp3 --lrc` |
 | **Disable Text Output** | `whisper video.mp4 --no-txt` |
+| **Disable Paragraphs** | `whisper video.mp4 --no-paragraphs` |
 | **Batch Process** | `whisper /path/to/folder/` |
 | **Direct File Picker** | `whisper --file-picker` |
 
@@ -60,6 +61,7 @@ When you run Whisper (via menu or Share), you will see a **20-second "Pre-Flight
 - **Smart:** Auto-detects audio formats (including OPUS/OGG) and checks for audio streams.
 - **Native Picker:** Visual file picker via Android System (`--file-picker`).
 - **Live Progress:** Real-time feedback showing transcription segments and timestamps.
+- **Smart Paragraphs:** Automatically structures text into paragraphs for better readability.
 - **Convenient:** Prompts to open the transcript immediately after processing.
 - **Batch:** Transcribe single files or entire directories.
 - **Subtitles:** Optionally generate `.srt` and `.vtt` files.

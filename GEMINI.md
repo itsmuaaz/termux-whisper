@@ -5,9 +5,12 @@
 
 ## 🟢 Current Status
 *   **Phase:** Polishing & Maintenance
-*   **Last Update:** 2026-01-07
+*   **Last Update:** 2026-02-16
 *   **Focus:** Stability, Usability, Mobile Integration, Multi-shell Support, and CLI UX Refactor.
 *   **Recent Changes:** 
+    *   **Smart Paragraphs:** Heuristic-based paragraphing for text output.
+    *   **Configurable Prompt:** User-definable initial prompt for punctuation/style control.
+    *   **Unlimited Line Width:** Default text wrapping removed for better readability.
     *   **CLI Support:** The `whisper` command now accepts arguments (e.g., `whisper file.mp3 --model base`) for direct execution, bypassing the menu.
     *   **Pre-Flight Check:** Added a 20-second interactive dashboard before transcription starts (unless skipped via CLI flags).
     *   **Global Preferences:** Renamed "Quick Settings" to clarify they persist across sessions. Added toggles for Text, Subs, and LRC output.

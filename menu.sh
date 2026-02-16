@@ -19,6 +19,16 @@ NC='\033[0m'
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "DEFAULT_LANG=auto" > "$CONFIG_FILE"
 fi
+# Ensure defaults exist
+if ! grep -q "INITIAL_PROMPT=" "$CONFIG_FILE"; then
+    echo "INITIAL_PROMPT=\"Hello! Welcome to this transcription. I will speak clearly, use proper punctuation, and capitalize sentences correctly.\"" >> "$CONFIG_FILE"
+fi
+if ! grep -q "MAX_LINE_LEN=" "$CONFIG_FILE"; then
+    echo "MAX_LINE_LEN=0" >> "$CONFIG_FILE"
+fi
+if ! grep -q "SMART_PARAGRAPHS=" "$CONFIG_FILE"; then
+    echo "SMART_PARAGRAPHS=true" >> "$CONFIG_FILE"
+fi
 source "$CONFIG_FILE"
 
 # DIRECT EXECUTION MODE
@@ -144,6 +154,31 @@ toggle_lrc() {
     read -p "Press Enter to return..." dummy
 }
 
+toggle_paragraphs() {
+    clear
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}       Smart Paragraphs                 ${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    
+    # Toggle logic
+    if [ "$SMART_PARAGRAPHS" = "true" ]; then
+        NEW_VAL="false"
+        echo -e "${YELLOW}Smart Paragraphs Disabled.${NC}"
+    else
+        NEW_VAL="true"
+        echo -e "${GREEN}Smart Paragraphs Enabled.${NC}"
+    fi
+
+    # Update Config
+    if grep -q "SMART_PARAGRAPHS=" "$CONFIG_FILE"; then
+        sed -i "s/SMART_PARAGRAPHS=.*/SMART_PARAGRAPHS=$NEW_VAL/" "$CONFIG_FILE"
+    else
+        echo "SMART_PARAGRAPHS=$NEW_VAL" >> "$CONFIG_FILE"
+    fi
+    
+    read -p "Press Enter to return..." dummy
+}
+
 toggle_share() {
     local TERMUX_BIN="$HOME/bin"
     local HOOK_FILE="$TERMUX_BIN/termux-file-editor"
@@ -195,6 +230,34 @@ EOF
     read -p "Press Enter to return..." dummy
 }
 
+edit_prompt() {
+    clear
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}       Edit Initial Prompt              ${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    echo "Current Prompt:"
+    echo -e "${YELLOW}$INITIAL_PROMPT${NC}"
+    echo ""
+    echo "Enter new prompt (leave empty to keep current):"
+    read -p "> " new_prompt
+
+    if [ -n "$new_prompt" ]; then
+        # Escape potential slashes for sed
+        safe_prompt=$(echo "$new_prompt" | sed 's/[\/&]/\\&/g')
+        
+        if grep -q "INITIAL_PROMPT=" "$CONFIG_FILE"; then
+            sed -i "s/INITIAL_PROMPT=.*/INITIAL_PROMPT=\"$safe_prompt\"/" "$CONFIG_FILE"
+        else
+            echo "INITIAL_PROMPT=\"$new_prompt\"" >> "$CONFIG_FILE"
+        fi
+        INITIAL_PROMPT="$new_prompt"
+        echo -e "${GREEN}Prompt updated.${NC}"
+    else
+        echo -e "${YELLOW}No change made.${NC}"
+    fi
+    read -p "Press Enter to return..." dummy
+}
+
 settings_menu() {
     local TERMUX_BIN="$HOME/bin"
     local HOOK_FILE="$TERMUX_BIN/termux-file-editor"
@@ -218,6 +281,9 @@ settings_menu() {
         local LRC_STATUS="${RED}Disabled${NC}"
         if [ "$GENERATE_LRC" = "true" ]; then LRC_STATUS="${GREEN}Enabled${NC}"; fi
 
+        local PARA_STATUS="${RED}Disabled${NC}"
+        if [ "$SMART_PARAGRAPHS" = "true" ]; then PARA_STATUS="${GREEN}Enabled${NC}"; fi
+
         clear
         echo -e "${BLUE}========================================${NC}"
         echo -e "${BLUE}         Global Preferences             ${NC}"
@@ -226,8 +292,10 @@ settings_menu() {
         echo -e "  2) Generate Text Transcript [$TXT_STATUS]"
         echo -e "  3) Generate Subtitles [$SUBS_STATUS]"
         echo -e "  4) Generate LRC (Karaoke) [$LRC_STATUS]"
-        echo -e "  5) Android Share Integration [$SHARE_STATUS]"
-        echo -e "  6) View Config File"
+        echo -e "  5) Smart Paragraphs [$PARA_STATUS]"
+        echo -e "  6) Android Share Integration [$SHARE_STATUS]"
+        echo -e "  7) Edit Initial Prompt"
+        echo -e "  8) View Config File"
         echo -e "  b) Back"
         echo ""
         read -p "Select: " opt
@@ -236,8 +304,10 @@ settings_menu() {
             2) toggle_txt ;;
             3) toggle_subs ;;
             4) toggle_lrc ;;
-            5) toggle_share ;;
-            6) 
+            5) toggle_paragraphs ;;
+            6) toggle_share ;;
+            7) edit_prompt ;;
+            8) 
                 clear
                 echo -e "${BLUE}========================================${NC}"
                 echo -e "${BLUE}           Config File                  ${NC}"

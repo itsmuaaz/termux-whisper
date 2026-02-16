@@ -48,6 +48,9 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
+# Set defaults for new config values if missing
+: "${SMART_PARAGRAPHS:=true}"
+
 show_usage() {
     echo -e "${BLUE}Usage:${NC} whisper [file_or_folder] [options]"
     echo ""
@@ -60,6 +63,8 @@ show_usage() {
     echo -e "  --no-subs           Disable subtitle generation"
     echo -e "  --lrc               Generate .lrc lyrics"
     echo -e "  --no-lrc            Disable lyrics generation"
+    echo -e "  --paragraphs        Enable smart paragraph formatting (default)"
+    echo -e "  --no-paragraphs     Disable smart paragraph formatting"
     echo -e "  --file-picker       Launch Android System File Picker"
     echo ""
     echo -e "${YELLOW}Examples:${NC}"
@@ -101,6 +106,16 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-lrc)
       GENERATE_LRC=false
+      CLI_OVERRIDE=true
+      shift # past argument
+      ;;
+    --paragraphs)
+      SMART_PARAGRAPHS=true
+      CLI_OVERRIDE=true
+      shift # past argument
+      ;;
+    --no-paragraphs)
+      SMART_PARAGRAPHS=false
       CLI_OVERRIDE=true
       shift # past argument
       ;;
@@ -357,6 +372,56 @@ show_post_actions() {
         esac
     done
 }
+
+# ==============================================================================
+# POST-PROCESSING
+# ==============================================================================
+
+format_output() {
+    local file="$1"
+    local width="${2:-0}"
+    local temp_out="${file}.tmp"
+    
+    # If width is 0 or less, use a large number to simulate "no wrap"
+    # This joins segments into long paragraphs.
+    if [ "$width" -le 0 ]; then
+        width=2000
+    fi
+    
+    if [ ! -s "$file" ]; then return; fi
+    
+    echo -e "${BLUE}[INFO]${NC} Formatting text (paragraphs & wrapping)..."
+    
+    # 1. Inject paragraph breaks every ~3 sentences (counting punctuation)
+    #    BUT only if the line actually ends with a sentence closer.
+    # 2. Use 'fmt' to reflow text to width
+    awk '{
+        # Count punctuation in this line
+        n = split($0, x, /[.?!]/)
+        puncts = n - 1
+        
+        if (puncts > 0) {
+            count += puncts
+        }
+
+        print $0
+        
+        # If we have accumulated 3+ sentences AND the current line ends with punctuation
+        if (count >= 3 && $0 ~ /[.?!]["'\'']?[[:space:]]*$/) {
+            print ""
+            count = 0
+        }
+    }' "$file" | fmt -w "$width" > "$temp_out"
+    
+    # Robust Check: Only overwrite if temp file is valid/non-empty
+    if [ -s "$temp_out" ]; then
+        mv "$temp_out" "$file"
+    else
+        echo -e "${YELLOW}[WARN]${NC} Formatting failed or produced empty output. Keeping original."
+        rm -f "$temp_out"
+    fi
+}
+
 transcribe_file() {
     local input_file="$1"
     local interactive="${2:-true}"
@@ -400,6 +465,9 @@ transcribe_file() {
     fi
 
     # Build Command
+    local line_len="${MAX_LINE_LEN:-80}"
+    local prompt_text="${INITIAL_PROMPT:-Hello! Welcome to this transcription. I will speak clearly, use proper punctuation, and capitalize sentences correctly.}"
+
     local cmd_args=(
         "-m" "$MODEL_FILE"
         "-f" "$temp_wav"
@@ -408,8 +476,15 @@ transcribe_file() {
         "-of" "$output_base"
     )
 
-    if [ -n "$DEFAULT_LANG" ] && [ "$DEFAULT_LANG" != "auto" ]; then
-        cmd_args+=("-l" "$DEFAULT_LANG")
+    # Language Logic
+    local lang_to_use="${DEFAULT_LANG:-auto}"
+    if [ -n "$lang_to_use" ]; then
+        cmd_args+=("-l" "$lang_to_use")
+    fi
+
+    # Prompt Logic (Safety: Only apply English prompt if Lang is EN or AUTO)
+    if [[ "$lang_to_use" == "auto" || "$lang_to_use" == "en" ]]; then
+        cmd_args+=("--prompt" "$prompt_text")
     fi
 
     # Output selection
@@ -443,6 +518,10 @@ transcribe_file() {
     
     echo ""
     if [ "$GENERATE_TXT" = true ]; then
+        # Apply Post-Processing Formatting (if enabled)
+        if [ "$SMART_PARAGRAPHS" = true ]; then
+            format_output "${output_base}.txt" "$line_len"
+        fi
         echo -e "${GREEN}[DONE]${NC} Saved: ${output_base}.txt"
     fi
     if [ "$GENERATE_SUBS" = true ]; then
@@ -521,12 +600,17 @@ pre_flight_check() {
     # LRC Status
     if [ "$GENERATE_LRC" = true ]; then L_STAT="${GREEN}ON${NC}"; else L_STAT="${RED}OFF${NC}"; fi
     echo -e "Lyrics:  $L_STAT"
+
+    # Paragraphs Status
+    if [ "$SMART_PARAGRAPHS" = true ]; then P_STAT="${GREEN}ON${NC}"; else P_STAT="${RED}OFF${NC}"; fi
+    echo -e "Paragraphs: $P_STAT"
     
     echo -e "----------------------------------------"
     echo -e "[Enter]  Start Now"
     echo -e "[T]      Toggle Text (.txt)"
     echo -e "[S]      Toggle Subtitles (.srt/.vtt)"
     echo -e "[L]      Toggle Lyrics (.lrc)"
+    echo -e "[P]      Toggle Smart Paragraphs"
     echo -e "[M]      Change Model"
     echo -e "[Q]      Cancel"
     echo ""
@@ -544,6 +628,9 @@ pre_flight_check() {
           ;;
         l|L) 
           if [ "$GENERATE_LRC" = true ]; then GENERATE_LRC=false; else GENERATE_LRC=true; fi 
+          ;;
+        p|P) 
+          if [ "$SMART_PARAGRAPHS" = true ]; then SMART_PARAGRAPHS=false; else SMART_PARAGRAPHS=true; fi 
           ;;
         m|M)
           echo ""
